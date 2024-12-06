@@ -14,6 +14,13 @@ from databases.base import Mongo, Redis, SearchEngine
 from databases.comment import CommentSearch
 
 
+class SubtitleDownload(Mongo):
+    def add_download(self, _id):
+        self.db["subtitle"].find_one_and_update(
+            {"_id": _id}, {"$inc": {"downloads": 1}}
+        )
+
+
 class Resource(SearchEngine):
     def fansub_search(self, class_name: str, kw: str):
         class_ = globals().get(class_name)
@@ -79,8 +86,18 @@ class Resource(SearchEngine):
             data = self.db["yyets"].find(
                 {
                     "$or": [
-                        {"data.info.cnname": {"$regex": f".*{keyword}.*", "$options": "i"}},
-                        {"data.info.enname": {"$regex": f".*{keyword}.*", "$options": "i"}},
+                        {
+                            "data.info.cnname": {
+                                "$regex": f".*{keyword}.*",
+                                "$options": "i",
+                            }
+                        },
+                        {
+                            "data.info.enname": {
+                                "$regex": f".*{keyword}.*",
+                                "$options": "i",
+                            }
+                        },
                         {
                             "data.info.aliasname": {
                                 "$regex": f".*{keyword}.*",
@@ -113,7 +130,9 @@ class Resource(SearchEngine):
             hide_phone(comments.get("data", []))
             for c in comments.get("data", []):
                 comment_rid = c["resource_id"]
-                res = self.db["yyets"].find_one({"data.info.id": comment_rid}, projection={"data.info": True})
+                res = self.db["yyets"].find_one(
+                    {"data.info.id": comment_rid}, projection={"data.info": True}
+                )
                 if res:
                     comment_data.append(
                         {
@@ -227,11 +246,17 @@ class Top(Mongo):
                 most_like[_id] = most_like.get(_id, 0) + 1
         most = sorted(most_like, key=most_like.get)
         most.reverse()
-        most_like_data = self.db["yyets"].find({"data.info.id": {"$in": most}}, self.projection).limit(15)
+        most_like_data = (
+            self.db["yyets"]
+            .find({"data.info.id": {"$in": most}}, self.projection)
+            .limit(15)
+        )
         return list(most_like_data)
 
     def get_top_resource(self) -> dict:
-        area_dict = dict(ALL={"$regex": ".*"}, US="美国", JP="日本", KR="韩国", UK="英国")
+        area_dict = dict(
+            ALL={"$regex": ".*"}, US="美国", JP="日本", KR="韩国", UK="英国"
+        )
         all_data = {"ALL": "全部"}
         for abbr, area in area_dict.items():
             data = (
@@ -283,7 +308,9 @@ class ResourceLatest(Mongo, Redis):
                             "date": ts_date(int(ts)),
                         }
 
-        sorted_res: list = sorted(episode_data.items(), key=lambda x: x[1]["timestamp"], reverse=True)
+        sorted_res: list = sorted(
+            episode_data.items(), key=lambda x: x[1]["timestamp"], reverse=True
+        )
         limited_res = dict(sorted_res[:100])
         ok = []
         for k, v in limited_res.items():
